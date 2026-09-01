@@ -1037,6 +1037,12 @@ if __name__ == "__main__":
     rfq_quantity = 5.0,
     rfq_unit = "Tons",
     delivery_location = "Chennai Plant",
-    vendor_quotes_folder = r"C:\Users\HP\RFQ_Agent\vendor_quotes",
+    vendor_quotes_folder = os.environ.get(
+        "VENDOR_QUOTES_FOLDER",
+        os.path.join(
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+            "vendor_quotes",
+        ),
+    ),
     thread_id = "rfq-2026-002",
 )

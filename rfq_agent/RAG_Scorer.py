@@ -5,12 +5,46 @@ from langchain_mistralai import ChatMistralAI
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_mistralai import MistralAIEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
 load_dotenv()
 api_key=os.getenv("MISTRAL_API_KEY")
 client=ChatMistralAI(model="ministral-8b-latest",api_key=api_key)
+
+# ---------------------------------------------------------
+# Cross-platform paths (Windows local / Linux on Render)
+# ---------------------------------------------------------
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+POLICY_PDF = os.environ.get(
+    "POLICY_PDF",
+    os.path.join(BASE_DIR, "procurement_policy.pdf")
+)
+
+CHROMA_DIR = os.environ.get(
+    "CHROMA_DIR",
+    os.path.join(BASE_DIR, "Chroma_policy")
+)
+
+
+def get_embeddings() -> MistralAIEmbeddings:
+    """
+    Embeddings via the Mistral API.
+
+    Previously this used HuggingFaceEmbeddings (all-MiniLM-L6-v2),
+    which pulls in torch + transformers (~1 GB) and will not fit
+    in Render's free tier. The API call has no local model weights.
+
+    Note: mistral-embed returns 1024-dim vectors vs MiniLM's 384,
+    so any Chroma DB built with the old embeddings must be deleted
+    and rebuilt once.
+    """
+    return MistralAIEmbeddings(
+        model="mistral-embed",
+        api_key=api_key
+    )
 
 #upload the files to chroma
 def uploadToChroma() -> Chroma:
@@ -22,11 +56,9 @@ def uploadToChroma() -> Chroma:
     filter policy documents during retrieval.
     """
 
-    Folder_dir = "Chroma_policy"
+    Folder_dir = CHROMA_DIR
 
-    embediddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    embediddings = get_embeddings()
 
     # ---------------------------------------------------------
     # If Chroma DB already exists, load it
@@ -48,7 +80,7 @@ def uploadToChroma() -> Chroma:
     print("Creating Chroma policy database...")
 
     loader = PyMuPDFLoader(
-        r"C:\Users\HP\RFQ_Agent\procurement_policy.pdf"
+        POLICY_PDF
     )
 
     pages = loader.load()
@@ -107,7 +139,7 @@ def policy_context(
     # ---------------------------------------------------------
 
     loader = PyMuPDFLoader(
-        r"C:\Users\HP\RFQ_Agent\procurement_policy.pdf"
+        POLICY_PDF
     )
 
     pages = loader.load()
