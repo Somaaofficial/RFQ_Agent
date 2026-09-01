@@ -480,12 +480,27 @@ def rank_and_summarise_node(state: RFQState) -> dict:
         reasons = {}
         for v in ranked:
             why = []
-            if risks.get(v, {}).get("disqualify_recommended", False):
-                flags = risks.get(v, {}).get("red_flags", [])
-                why.append("Risk: " + ("; ".join(flags[:3]) if flags else "red flags raised"))
-            if tech_sc.get(v, {}).get("disqualify_on_tech", False):
-                gaps = tech_sc.get(v, {}).get("mandatory_gaps", [])
-                why.append("Technical: " + ("; ".join(gaps[:3]) if gaps else "mandatory criteria not met"))
+
+            risk_v = risks.get(v, {})
+            if risk_v.get("disqualify_recommended", False):
+                # all_flags entries look like {"severity": "RED", "message": ...}
+                red = [
+                    f.get("message") or f.get("flag") or str(f)
+                    for f in risk_v.get("all_flags", [])
+                    if isinstance(f, dict) and f.get("severity") == "RED"
+                ]
+                detail = "; ".join(red[:3]) if red else (
+                    risk_v.get("risk_summary")
+                    or f"{risk_v.get('red_count', 0)} red flag(s)"
+                )
+                why.append(f"Risk: {detail}")
+
+            tech_v = tech_sc.get(v, {})
+            if tech_v.get("disqualify_on_tech", False):
+                gaps = [str(g) for g in tech_v.get("disqualify_reasons", []) if g]
+                detail = "; ".join(gaps[:3]) if gaps else "mandatory criteria not met"
+                why.append(f"Technical: {detail}")
+
             if why:
                 reasons[v] = why
 
@@ -1199,6 +1214,29 @@ def run_rfq_agent(
             "HOLD: [reason]",
             "REJECT: [reason]",
         ]
+
+        # A node that calls interrupt() is suspended before its return
+        # statement executes, so email_subject/email_html are not in state
+        # yet - they only land on resume. The values we need were passed
+        # into interrupt(), so read them back off the pending task.
+        try:
+            for task in (state_snapshot.tasks or ()):
+                for intr in (getattr(task, "interrupts", None) or ()):
+                    payload = getattr(intr, "value", None)
+                    if isinstance(payload, dict):
+                        paused_state.setdefault(
+                            "email_subject", payload.get("email_subject", "")
+                        )
+                        paused_state.setdefault(
+                            "email_html", payload.get("email_html", "")
+                        )
+                        paused_state.setdefault(
+                            "email_recipient", payload.get("manager_email", "")
+                        )
+                        paused_state["interrupt_message"] = payload.get("message", "")
+        except Exception as exc:                       # noqa: BLE001
+            print(f"  ⚠️  Could not read interrupt payload: {exc}")
+
         print(f"\n⏸️  Returning to caller — awaiting decision on '{thread_id}'")
         return paused_state
 

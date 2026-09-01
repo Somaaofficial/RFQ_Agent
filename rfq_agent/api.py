@@ -290,6 +290,7 @@ def _summarise(result):
             'subject':   result.get('email_subject', ''),
             'html':      result.get('email_html', ''),
             'recipient': result.get('email_recipient', ''),
+            'message':   result.get('interrupt_message', ''),
             'delivered_to_outlook': result.get('outlook_draft_created', False),
         },
         'report': {
