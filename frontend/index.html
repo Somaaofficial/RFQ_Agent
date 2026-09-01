@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RFQ Intelligence Agent</title>
+<style>
+  :root{
+    --bg:#0f1424; --panel:#171d33; --panel-2:#1e2542; --line:#2a3357;
+    --txt:#e8ecf8; --muted:#98a2c7; --accent:#6c7cff; --accent-2:#8b5cf6;
+    --ok:#2dd4a7; --warn:#fbbf24; --bad:#f87171; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:linear-gradient(160deg,#0f1424,#141a30 60%,#101528);
+    color:var(--txt); font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:32px 20px 80px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{width:42px;height:42px;border-radius:11px;flex:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:grid;place-items:center;font-size:20px}
+  h1{font-size:23px;margin:0;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13.5px;margin:0}
+  .status-pill{margin-left:auto;font-size:12px;padding:6px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);white-space:nowrap}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--muted);margin-right:6px;vertical-align:1px}
+  .dot.up{background:var(--ok)} .dot.down{background:var(--bad)}
+
+  .card{background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px;margin-top:20px}
+  .card h2{font-size:15px;margin:0 0 4px;letter-spacing:.2px}
+  .card .hint{color:var(--muted);font-size:13px;margin:0 0 16px}
+
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:34px 20px;
+    text-align:center;cursor:pointer;transition:.18s;background:var(--panel-2)}
+  .drop:hover,.drop.over{border-color:var(--accent);background:#212a4d}
+  .drop .big{font-size:30px;margin-bottom:8px}
+  .drop .fname{color:var(--accent);font-weight:600;word-break:break-all}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
+  button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 20px;
+    cursor:pointer;transition:.15s;color:#fff;background:var(--panel-2);
+    border:1px solid var(--line)}
+  button:hover:not(:disabled){transform:translateY(-1px)}
+  button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border:0}
+  .ok{background:var(--ok);color:#04231a;border:0}
+  .warnb{background:var(--warn);color:#3a2a00;border:0}
+  .bad{background:var(--bad);color:#3d0d0d;border:0}
+  .ghost{background:transparent}
+
+  .bar{height:5px;background:var(--panel-2);border-radius:99px;overflow:hidden;margin-top:16px}
+  .bar i{display:block;height:100%;width:35%;border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    animation:slide 1.25s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+
+  .msg{padding:12px 15px;border-radius:10px;font-size:13.5px;margin-top:14px;border:1px solid}
+  .msg.err{background:#3a1620;border-color:#7f2438;color:#ffb4c0}
+  .msg.inf{background:#132a3f;border-color:#245275;color:#a8d6ff}
+  .msg.good{background:#0f3029;border-color:#1c6b57;color:#8ff0d4}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .kpi .l{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px}
+  .kpi .v{font-size:19px;font-weight:700;margin-top:5px;word-break:break-word}
+
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13.5px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.6px;padding:9px 10px;border-bottom:1px solid var(--line)}
+  td{padding:11px 10px;border-bottom:1px solid #222a49;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
+  .tag.ok{background:#0f3029;color:var(--ok)}
+  .tag.bad{background:#3a1620;color:var(--bad)}
+  .rank{color:var(--muted);font-variant-numeric:tabular-nums}
+  .why{color:var(--muted);font-size:12.5px;margin-top:3px}
+
+  details{margin-top:14px;border:1px solid var(--line);border-radius:11px;background:var(--panel-2)}
+  summary{cursor:pointer;padding:13px 16px;font-weight:600;font-size:13.5px;user-select:none}
+  .mailbox{background:#fff;color:#111;border-radius:0 0 10px 10px;padding:16px;
+    max-height:520px;overflow:auto}
+  .subject{padding:12px 16px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px;word-break:break-word}
+
+  .hide{display:none}
+  code{background:var(--panel-2);padding:2px 6px;border-radius:5px;font-size:12.5px}
+  footer{margin-top:26px;color:var(--muted);font-size:12px;text-align:center}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">📋</div>
+    <div>
+      <h1>RFQ Intelligence Agent</h1>
+      <p class="sub">Automated vendor comparison with human approval</p>
+    </div>
+    <div class="status-pill" id="apiStatus"><span class="dot" id="apiDot"></span>checking backend…</div>
+  </header>
+
+  <!-- ── Upload ────────────────────────────────────────────────── -->
+  <section class="card">
+    <h2>1 · Upload vendor quotes</h2>
+    <p class="hint">A ZIP containing vendor quotation PDFs. Processing takes 2–4 minutes.</p>
+
+    <div class="drop" id="drop">
+      <div class="big">📦</div>
+      <div id="dropText">Drag a ZIP here, or click to browse</div>
+      <div class="fname hide" id="fileName"></div>
+    </div>
+    <input type="file" id="file" accept=".zip" class="hide" />
+
+    <div class="row">
+      <button class="primary" id="go" disabled>Process RFQ</button>
+      <button class="ghost" id="clear" disabled>Clear</button>
+    </div>
+
+    <div class="bar hide" id="bar"><i></i></div>
+    <div id="uploadMsg"></div>
+  </section>
+
+  <!-- ── Results ───────────────────────────────────────────────── -->
+  <section class="card hide" id="results">
+    <h2>2 · Evaluation result</h2>
+    <p class="hint" id="resultHint"></p>
+
+    <div class="kpis" id="kpis"></div>
+    <div id="verdict"></div>
+
+    <h2 style="margin-top:24px">Vendor ranking</h2>
+    <table>
+      <thead>
+        <tr><th style="width:44px">#</th><th>Vendor</th><th style="width:110px">Score</th><th style="width:150px">Status</th></tr>
+      </thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+
+    <details id="mailWrap">
+      <summary>📧 Full comparison report (the notification content)</summary>
+      <div class="subject" id="mailSubject"></div>
+      <div class="mailbox" id="mailBody"></div>
+    </details>
+
+    <div class="row">
+      <button class="ghost" id="dl">⬇ Download Excel report</button>
+    </div>
+  </section>
+
+  <!-- ── HITL ──────────────────────────────────────────────────── -->
+  <section class="card hide" id="hitl">
+    <h2>3 · Your decision</h2>
+    <p class="hint">
+      The agent has paused and is waiting for you.
+      Session id <code id="tid"></code>
+    </p>
+
+    <div class="msg inf" id="expiryNote">
+      ⏱ Approve within ~15 minutes. Paused reviews are held in server memory and
+      are lost if the service sleeps or restarts.
+    </div>
+
+    <div class="row">
+      <button class="ok"    data-act="APPROVE">✓ Approve</button>
+      <button class="ghost" data-act="SELECT">⇄ Choose another vendor</button>
+      <button class="warnb" data-act="HOLD">⏸ Hold</button>
+      <button class="bad"   data-act="REJECT">✕ Reject all</button>
+    </div>
+
+    <div id="decisionMsg"></div>
+  </section>
+
+  <footer>
+    Backend <span id="apiUrl"></span>
+  </footer>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────
+// Override by adding ?api=https://your-backend.onrender.com to the URL.
+const API = new URLSearchParams(location.search).get('api')
+         || 'https://rfq-agent-82y2.onrender.com';
+
+const $ = id => document.getElementById(id);
+let selectedFile = null;
+let threadId     = null;
+let lastSummary  = null;
+
+$('apiUrl').textContent = API;
+
+// ── Backend health ─────────────────────────────────────────────────
+(async function ping(){
+  try{
+    const r = await fetch(API + '/health');
+    const j = await r.json();
+    $('apiDot').className = 'dot up';
+    $('apiStatus').innerHTML =
+      '<span class="dot up"></span>backend online · ' + (j.platform || '');
+  }catch(e){
+    $('apiDot').className = 'dot down';
+    $('apiStatus').innerHTML =
+      '<span class="dot down"></span>backend unreachable';
+  }
+})();
+
+// ── File picking ───────────────────────────────────────────────────
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files.length) pick(e.dataTransfer.files[0]);
+};
+$('file').onchange = e => { if (e.target.files.length) pick(e.target.files[0]); };
+
+function pick(f){
+  if (!f.name.toLowerCase().endsWith('.zip')){
+    return note('uploadMsg','err','Please choose a .zip file.');
+  }
+  selectedFile = f;
+  $('dropText').classList.add('hide');
+  const fn = $('fileName');
+  fn.classList.remove('hide');
+  fn.textContent = f.name + '  (' + (f.size/1024).toFixed(0) + ' KB)';
+  $('go').disabled = false;
+  $('clear').disabled = false;
+  $('uploadMsg').innerHTML = '';
+}
+
+$('clear').onclick = () => {
+  selectedFile = null; $('file').value = '';
+  $('dropText').classList.remove('hide');
+  $('fileName').classList.add('hide');
+  $('go').disabled = true; $('clear').disabled = true;
+  $('uploadMsg').innerHTML = '';
+  $('results').classList.add('hide');
+  $('hitl').classList.add('hide');
+};
+
+function note(el,kind,html){ $(el).innerHTML = '<div class="msg '+kind+'">'+html+'</div>'; }
+
+// ── Upload + process ───────────────────────────────────────────────
+$('go').onclick = async () => {
+  if (!selectedFile) return;
+  $('go').disabled = true; $('clear').disabled = true;
+  $('bar').classList.remove('hide');
+  note('uploadMsg','inf','Processing… extracting PDFs, scoring vendors against '
+     + 'procurement policy. This usually takes 2–4 minutes — keep this tab open.');
+
+  const fd = new FormData();
+  fd.append('files', selectedFile);
+
+  try{
+    const r = await fetch(API + '/api/rfq/upload', { method:'POST', body:fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (!j.summary) throw new Error(
+      'No vendor quotes were found in that ZIP. It should contain vendor quotation PDFs.');
+
+    lastSummary = j.summary;
+    threadId    = j.summary.thread_id;
+    render(j.summary);
+    note('uploadMsg','good','✓ Processed ' + (j.files||1) + ' file(s).');
+  }catch(err){
+    note('uploadMsg','err','<b>Failed:</b> ' + err.message);
+  }finally{
+    $('bar').classList.add('hide');
+    $('go').disabled = false; $('clear').disabled = false;
+  }
+};
+
+// ── Render results ─────────────────────────────────────────────────
+function render(s){
+  $('results').classList.remove('hide');
+
+  const ranked = s.ranked_vendors || [];
+  const qual   = s.qualified_vendors || [];
+  const scores = s.vendor_scores || {};
+
+  $('resultHint').textContent =
+    ranked.length + ' vendor(s) evaluated · ' + qual.length + ' qualified';
+
+  $('kpis').innerHTML = [
+    kpi('Recommendation', s.top_recommendation || '—'),
+    kpi('Vendors evaluated', ranked.length),
+    kpi('Qualified', qual.length),
+    kpi('Report', s.report && s.report.available ? 'Ready' : 'Not generated')
+  ].join('');
+
+  // Verdict
+  if (s.all_disqualified){
+    const d = s.recommendation_details || {};
+    let html = '<div class="msg err"><b>No vendor met the mandatory criteria.</b><br>'
+             + (s.recommendation_reason || '') + '</div>';
+    const reasons = d.disqualification_reasons || {};
+    if (Object.keys(reasons).length){
+      html += '<details open><summary>Why each vendor was disqualified</summary>'
+            + '<div style="padding:0 16px 14px">';
+      for (const [v, why] of Object.entries(reasons)){
+        html += '<div style="margin-top:10px"><b>' + esc(v) + '</b>'
+              + '<div class="why">' + esc(why.join(' · ')) + '</div></div>';
+      }
+      html += '</div></details>';
+    }
+    if ((d.suggested_actions||[]).length){
+      html += '<div class="msg inf"><b>Suggested next steps</b><ul style="margin:8px 0 0 18px">'
+            + d.suggested_actions.map(a => '<li>' + esc(a) + '</li>').join('')
+            + '</ul></div>';
+    }
+    $('verdict').innerHTML = html;
+  } else if (s.top_recommendation){
+    $('verdict').innerHTML = '<div class="msg good"><b>Recommended: '
+      + esc(s.top_recommendation) + '</b><br>'
+      + esc(s.recommendation_reason || '') + '</div>';
+  } else {
+    $('verdict').innerHTML = '';
+  }
+
+  // Ranking table
+  $('rankBody').innerHTML = ranked.map((v,i) => {
+    const sc  = scores[v] || {};
+    const ok  = qual.includes(v);
+    const tot = sc.total_score != null ? Number(sc.total_score).toFixed(1) : '—';
+    return '<tr><td class="rank">' + (i+1) + '</td>'
+         + '<td>' + esc(v) + '</td>'
+         + '<td>' + tot + '</td>'
+         + '<td><span class="tag ' + (ok?'ok':'bad') + '">'
+         + (ok ? 'QUALIFIED' : 'DISQUALIFIED') + '</span></td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:var(--muted)">No vendors</td></tr>';
+
+  // Notification content
+  const n = s.notification || {};
+  if (n.html){
+    $('mailSubject').textContent = n.subject || '';
+    $('mailBody').innerHTML = n.html;
+    $('mailWrap').classList.remove('hide');
+  } else {
+    $('mailWrap').classList.add('hide');
+  }
+
+  // HITL
+  if (s.awaiting_decision){
+    $('tid').textContent = s.thread_id || '';
+    $('hitl').classList.remove('hide');
+    $('decisionMsg').innerHTML = '';
+    enableDecisions(true);
+  } else {
+    $('hitl').classList.add('hide');
+  }
+}
+
+function kpi(l,v){
+  return '<div class="kpi"><div class="l">'+esc(l)+'</div><div class="v">'+esc(String(v))+'</div></div>';
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Decisions ──────────────────────────────────────────────────────
+function enableDecisions(on){
+  document.querySelectorAll('#hitl button[data-act]').forEach(b => b.disabled = !on);
+}
+
+document.querySelectorAll('#hitl button[data-act]').forEach(btn => {
+  btn.onclick = async () => {
+    const act = btn.dataset.act;
+    let decision = act;
+
+    if (act === 'SELECT'){
+      const opts = (lastSummary && lastSummary.ranked_vendors) || [];
+      const name = prompt('Vendor name to award:\n\n' + opts.join('\n'));
+      if (!name) return;
+      decision = 'SELECT: ' + name.trim();
+    } else if (act === 'HOLD' || act === 'REJECT'){
+      const why = prompt(act === 'HOLD' ? 'Reason for holding:' : 'Reason for rejecting:');
+      if (!why) return;
+      decision = act + ': ' + why.trim();
+    }
+
+    enableDecisions(false);
+    note('decisionMsg','inf','Checking the review session is still active…');
+
+    // Verify the paused graph still exists before committing.
+    try{
+      const st = await fetch(API + '/api/rfq/status/' + encodeURIComponent(threadId));
+      const sj = await st.json();
+      if (!sj.exists){
+        note('decisionMsg','err','<b>Session expired.</b> ' + esc(sj.message || '')
+          + '<br>Please upload the ZIP again.');
+        $('hitl').classList.add('hide');
+        return;
+      }
+      if (!sj.awaiting_decision){
+        note('decisionMsg','err','This review has already been completed.');
+        return;
+      }
+    }catch(e){
+      // Status check is a courtesy - fall through and let the decision speak.
+    }
+
+    note('decisionMsg','inf','Submitting <b>' + esc(decision) + '</b>…');
+
+    try{
+      const r = await fetch(API + '/api/rfq/decision', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ thread_id: threadId, decision })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+
+      const sel = (j.summary && j.summary.selected_vendor) || '';
+      note('decisionMsg','good','✓ Decision recorded: <b>' + esc(decision) + '</b>'
+        + (sel ? '<br>Selected vendor: <b>' + esc(sel) + '</b>' : ''));
+
+      if (j.summary){ lastSummary = j.summary; render(j.summary); }
+      $('hitl').classList.add('hide');
+    }catch(err){
+      note('decisionMsg','err','<b>Failed:</b> ' + esc(err.message));
+      enableDecisions(true);
+    }
+  };
+});
+
+// ── Report download ────────────────────────────────────────────────
+$('dl').onclick = () => window.open(API + '/api/rfq/report', '_blank');
+</script>
+</body>
+</html>

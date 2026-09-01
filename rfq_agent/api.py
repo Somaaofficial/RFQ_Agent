@@ -15,8 +15,15 @@ from main_agent import start_rfq_agent, resume_rfq_agent, get_thread_status
 
 app = Flask(__name__)
 
-# Enable CORS for all routes
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Enable CORS for every route, not just /api/*.
+# The frontend is served from a different origin (Vercel), and it pings
+# /health to show backend status - that request was being blocked because
+# /health falls outside the /api/* pattern.
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    expose_headers=["Content-Disposition"],   # so the Excel filename survives
+)
 
 # Configuration
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
