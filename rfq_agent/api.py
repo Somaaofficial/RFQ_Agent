@@ -11,7 +11,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main_agent import run_rfq_agent
+from main_agent import start_rfq_agent, resume_rfq_agent
 
 app = Flask(__name__)
 
@@ -86,7 +86,7 @@ def upload_files():
 
         # Start processing
         try:
-            result = run_rfq_agent(
+            result = start_rfq_agent(
                 rfq_item="Uploaded Files",
                 rfq_quantity=1,
                 rfq_unit="lot",
@@ -188,7 +188,7 @@ def process_rfq():
         print(f"   Location: {delivery_location}")
 
         # Run agent with JSON parameters
-        result = run_rfq_agent(
+        result = start_rfq_agent(
             rfq_item=rfq_item,
             rfq_quantity=rfq_quantity,
             rfq_unit=rfq_unit,
@@ -244,9 +244,17 @@ def _summarise(result):
     report_path = result.get('report_path') or ''
 
     return {
+        # ── HITL ──────────────────────────────────────────────────────
+        'awaiting_decision': result.get('awaiting_decision', False),
+        'thread_id':         result.get('thread_id', ''),
+        'decision_options':  result.get('decision_options', []),
+        'human_decision':    result.get('human_decision', ''),
+        'selected_vendor':   result.get('selected_vendor', ''),
+
         'top_recommendation':    result.get('top_recommendation', ''),
         'recommendation_reason': result.get('recommendation_reason', ''),
         'ranked_vendors':        result.get('ranked_vendors', []),
+        'qualified_vendors':     result.get('qualified_vendors', []),
         'vendor_scores':         result.get('vendor_scores', {}),
         'risk_flags':            result.get('risk_flags', {}),
         'anomaly_flags':         result.get('anomaly_flags', {}),
@@ -263,6 +271,75 @@ def _summarise(result):
             'download_url': '/api/rfq/report',
         },
     }
+
+
+@app.route('/api/rfq/decision', methods=['POST'])
+def submit_decision():
+    """
+    Human-in-the-loop step.
+
+    The processing endpoints stop at the review pause and return a
+    thread_id. Once the reviewer has seen the comparison, they send
+    their decision here and the graph resumes from where it paused.
+
+    Body:
+      {
+        "thread_id": "api_ab12...",          # required
+        "decision":  "APPROVE"               # required
+                     | "SELECT: Tata Steel Ltd"
+                     | "HOLD: need revised freight"
+                     | "REJECT: all quotes over budget"
+      }
+    """
+    try:
+        data      = request.json or {}
+        thread_id = (data.get('thread_id') or '').strip()
+        decision  = (data.get('decision') or '').strip()
+
+        if not thread_id:
+            return jsonify({'error': 'thread_id is required'}), 400
+        if not decision:
+            return jsonify({
+                'error': 'decision is required',
+                'valid_options': [
+                    'APPROVE',
+                    'SELECT: [vendor name]',
+                    'HOLD: [reason]',
+                    'REJECT: [reason]',
+                ],
+            }), 400
+
+        verb = decision.split(':', 1)[0].strip().upper()
+        if verb not in {'APPROVE', 'SELECT', 'HOLD', 'REJECT'}:
+            return jsonify({
+                'error': f"Unrecognised decision '{decision}'",
+                'valid_options': [
+                    'APPROVE',
+                    'SELECT: [vendor name]',
+                    'HOLD: [reason]',
+                    'REJECT: [reason]',
+                ],
+            }), 400
+
+        print(f"\n🧑 Decision received for {thread_id}: {decision}")
+
+        try:
+            result = resume_rfq_agent(thread_id, decision)
+        except ValueError as ve:
+            # Unknown or already-completed thread
+            return jsonify({'error': str(ve)}), 409
+
+        return jsonify({
+            'message':   'Decision processed',
+            'thread_id': thread_id,
+            'decision':  decision,
+            'summary':   _summarise(result),
+            'result':    result,
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Decision error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/rfq/report', methods=['GET'])

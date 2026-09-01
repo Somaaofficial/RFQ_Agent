@@ -905,7 +905,68 @@ except Exception:                                      # noqa: BLE001
     scan_inbox_for_rfq_quotes = None
 
 
-def run_rfq_agent(
+# ══════════════════════════════════════════════════════════════════════════════
+# SHARED GRAPH + CHECKPOINTER
+#
+# The HITL interrupt pauses the graph mid-run. Over HTTP the pause and the
+# resume arrive as two separate requests, so the checkpointer has to outlive
+# a single call — hence module level rather than per-invocation.
+#
+# Caveat: MemorySaver is in-process. It survives across requests under
+# `gunicorn -w 1`, but not across a restart or a free-tier sleep. Swap for
+# SqliteSaver + a Render persistent disk if pauses need to survive that.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_CHECKPOINTER = MemorySaver()
+_COMPILED_APP = None
+
+
+def get_agent_app():
+    """Compile the graph once and reuse it across requests."""
+    global _COMPILED_APP
+    if _COMPILED_APP is None:
+        _COMPILED_APP = build_rfq_graph().compile(checkpointer=_CHECKPOINTER)
+    return _COMPILED_APP
+
+
+def resume_rfq_agent(thread_id: str, decision: str) -> dict:
+    """
+    Phase 2 — resume a graph paused at the HITL interrupt.
+
+    Args:
+        thread_id: the id returned by the phase-1 run
+        decision:  "APPROVE" | "SELECT: <vendor>" | "HOLD: <reason>"
+                   | "REJECT: <reason>"
+
+    Raises:
+        ValueError: if the thread is unknown or is not paused.
+    """
+    app    = get_agent_app()
+    config = {"configurable": {"thread_id": thread_id}}
+
+    snapshot = app.get_state(config)
+    if not snapshot or not snapshot.values:
+        raise ValueError(
+            f"Unknown thread '{thread_id}'. The server may have restarted; "
+            f"re-run the RFQ."
+        )
+    if not snapshot.next:
+        raise ValueError(f"Thread '{thread_id}' has already completed.")
+
+    print(f"\n🚀 PHASE 2 — Resuming '{thread_id}' with decision: {decision}")
+
+    for _ in app.stream(Command(resume=decision), config):
+        pass
+
+    final_state = app.get_state(config).values
+
+    print(f"  ✅ Decision processed  : {final_state.get('human_decision')}")
+    print(f"  ✅ Selected vendor     : {final_state.get('selected_vendor')}")
+
+    return final_state
+
+
+def start_rfq_agent(
         rfq_item:             str   = "HR Steel Sheets 3mm",
         rfq_quantity:         float = 10000.0,
         rfq_unit:             str   = "Kg",
@@ -913,6 +974,40 @@ def run_rfq_agent(
         vendor_quotes_folder: str   = "vendor_quotes",
         thread_id:            str   = "rfq-001",
 ):
+    """
+    Phase 1 — run the graph up to the HITL interrupt and return.
+
+    Never blocks on input(). The caller decides how to collect the human
+    decision, then calls resume_rfq_agent(thread_id, decision).
+
+    Returns the state at the pause point, plus:
+        awaiting_decision: bool
+        thread_id:         str
+    """
+    return run_rfq_agent(
+        rfq_item             = rfq_item,
+        rfq_quantity         = rfq_quantity,
+        rfq_unit             = rfq_unit,
+        delivery_location    = delivery_location,
+        vendor_quotes_folder = vendor_quotes_folder,
+        thread_id            = thread_id,
+        interactive          = False,
+    )
+
+
+def run_rfq_agent(
+        rfq_item:             str   = "HR Steel Sheets 3mm",
+        rfq_quantity:         float = 10000.0,
+        rfq_unit:             str   = "Kg",
+        delivery_location:    str   = "Mumbai Warehouse",
+        vendor_quotes_folder: str   = "vendor_quotes",
+        thread_id:            str   = "rfq-001",
+        interactive:          bool  = True,
+):
+    """
+    interactive=True   CLI mode - prompts for the decision on stdin.
+    interactive=False  Server mode - stops at the pause and returns.
+    """
     print(f"\n{'#'*60}")
     print(f"  RFQ INTELLIGENCE AGENT — STARTING")
     print(f"  Item     : {rfq_item}")
@@ -955,9 +1050,7 @@ def run_rfq_agent(
         print(f"\n  ⚠️  Folder not found: '{vendor_quotes_folder}/'")
         return None
 
-    graph  = build_rfq_graph()
-    memory = MemorySaver()
-    app    = graph.compile(checkpointer=memory)
+    app = get_agent_app()
 
     initial_state = {
         "rfq_item":             rfq_item,
@@ -1036,6 +1129,23 @@ def run_rfq_agent(
             print(f"        SELECT: {v}{marker}")
     print(f"   3. HOLD: [reason]           → pause, needs clarification")
     print(f"   4. REJECT: [reason]         → reject all, re-float RFQ")
+
+    # ── Server mode: stop here and let the caller collect the decision ────────
+    # There is no stdin under gunicorn, so input() would either raise
+    # EOFError or hang the worker until the request times out. The graph
+    # stays paused in the checkpointer; POST /api/rfq/decision resumes it.
+    if not interactive:
+        paused_state = dict(state_snapshot.values)
+        paused_state["awaiting_decision"] = True
+        paused_state["thread_id"]         = thread_id
+        paused_state["decision_options"]  = [
+            "APPROVE",
+            "SELECT: [vendor name]",
+            "HOLD: [reason]",
+            "REJECT: [reason]",
+        ]
+        print(f"\n⏸️  Returning to caller — awaiting decision on '{thread_id}'")
+        return paused_state
 
     human_decision = input("\n   Enter your decision: ").strip()
     if not human_decision:
