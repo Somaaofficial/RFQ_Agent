@@ -13,6 +13,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import sys
 import json
 from typing import Annotated, TypedDict, Optional
 from dotenv  import load_dotenv
@@ -646,29 +647,57 @@ def email_hitl_node(state: RFQState) -> dict:
     subject = (f"[ACTION REQUIRED] RFQ Evaluation Ready — "
                f"Recommend: {top} | {today}{savings_str}")
 
-    print(f"\n  📝 Creating draft in Outlook for {manager_email}...")
-    draft = create_outlook_draft(
-        to_email        = manager_email,
-        subject         = subject,
-        html_body       = html_body,
-        attachment_path = report_path or "RFQ_Comparison_Report.xlsx",
+    # ------------------------------------------------------------------
+    # Outlook draft creation is Windows-only (win32com/COM). When the
+    # agent runs on a Linux server there is no Outlook to talk to, so we
+    # skip it and hand the rendered email back to the caller instead.
+    # The review step is unchanged either way — only the delivery
+    # mechanism differs.
+    # ------------------------------------------------------------------
+    outlook_enabled = (
+        sys.platform == "win32"
+        and os.getenv("DISABLE_OUTLOOK", "0") != "1"
     )
 
-    if draft["success"]:
-        print(f"  ✅ Draft saved to Outlook Drafts")
-        print(f"  🆔 EntryID: {draft['entry_id']}")
+    draft = {"success": False, "entry_id": None, "store_id": None, "error": None}
+
+    if outlook_enabled:
+        print(f"\n  📝 Creating draft in Outlook for {manager_email}...")
+        try:
+            draft = create_outlook_draft(
+                to_email        = manager_email,
+                subject         = subject,
+                html_body       = html_body,
+                attachment_path = report_path or "RFQ_Comparison_Report.xlsx",
+            )
+        except Exception as exc:                       # noqa: BLE001
+            draft["error"] = str(exc)
+
+        if draft["success"]:
+            print(f"  ✅ Draft saved to Outlook Drafts")
+            print(f"  🆔 EntryID: {draft['entry_id']}")
+        else:
+            print(f"  ⚠️  Draft creation failed: {draft['error']}")
     else:
-        print(f"  ⚠️  Draft creation failed: {draft['error']}")
+        draft["error"] = "Outlook unavailable on this platform"
+        print(f"\n  📄 Outlook skipped (platform={sys.platform}).")
+        print(f"     Recommendation returned to the caller instead.")
 
     print(f"\n  ⏸️  GRAPH PAUSED — interrupt() fired")
     print(f"  Waiting for manager reply...")
 
     decision = interrupt({
-        "message":         "RFQ comparison draft created in Outlook. Awaiting approval.",
+        "message":         (
+            "RFQ comparison draft created in Outlook. Awaiting approval."
+            if draft["success"]
+            else "RFQ comparison ready for review. Awaiting approval."
+        ),
         "recommendation":  top,
         "reason":          rec_reason,
         "report_path":     report_path,
         "manager_email":   manager_email,
+        "email_subject":   subject,
+        "email_html":      html_body,
         "draft_entry_id":  draft["entry_id"],
         "draft_store_id":  draft["store_id"],
         "reply_options":   [
@@ -682,9 +711,13 @@ def email_hitl_node(state: RFQState) -> dict:
     print(f"\n  ▶️  GRAPH RESUMED — decision: '{decision}'")
 
     return {
-        "human_decision":  str(decision),
-        "draft_entry_id":  draft["entry_id"],
-        "draft_store_id":  draft["store_id"],
+        "human_decision":        str(decision),
+        "draft_entry_id":        draft["entry_id"],
+        "draft_store_id":        draft["store_id"],
+        "email_subject":         subject,
+        "email_html":            html_body,
+        "email_recipient":       manager_email,
+        "outlook_draft_created": bool(draft["success"]),
     }
 
 
@@ -863,7 +896,13 @@ def build_rfq_graph():
 # RUN THE AGENT  (updated initial_state with 4 new keys)
 # ══════════════════════════════════════════════════════════════════════════════
 
-from GetOutlookDocuments import scan_inbox_for_rfq_quotes
+# Outlook inbox scanning is Windows-only and no longer part of the flow
+# (files arrive via the upload endpoint). Import defensively so the module
+# still loads on Linux.
+try:
+    from GetOutlookDocuments import scan_inbox_for_rfq_quotes
+except Exception:                                      # noqa: BLE001
+    scan_inbox_for_rfq_quotes = None
 
 
 def run_rfq_agent(
@@ -951,6 +990,10 @@ def run_rfq_agent(
         "po_draft_store_id":    "",
         "draft_entry_id":       "",
         "draft_store_id":       "",
+        "email_subject":        "",
+        "email_html":           "",
+        "email_recipient":      "",
+        "outlook_draft_created": False,
         "thread_id":            thread_id,
     }
 

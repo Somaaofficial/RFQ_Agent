@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
@@ -102,6 +102,7 @@ def upload_files():
             'uploadId': upload_id,
             'files': len(saved_files),
             'message': f'Successfully uploaded {len(saved_files)} file(s)',
+            'summary': _summarise(result),
             'result': result
         }), 200
 
@@ -199,6 +200,7 @@ def process_rfq():
         return jsonify({
             'message': 'RFQ processing complete',
             'thread_id': thread_id,
+            'summary': _summarise(result),
             'result': result
         }), 200
 
@@ -228,10 +230,69 @@ def get_stats():
         return jsonify({'error': str(e)}), 500
 
 
+def _summarise(result):
+    """
+    Flatten the agent's final state into what the UI needs.
+
+    Outlook drafting is Windows-only, so on the server we hand back the
+    rendered email instead of creating a draft. The frontend displays it
+    and offers the Excel report for download.
+    """
+    if not isinstance(result, dict):
+        return None
+
+    report_path = result.get('report_path') or ''
+
+    return {
+        'top_recommendation':    result.get('top_recommendation', ''),
+        'recommendation_reason': result.get('recommendation_reason', ''),
+        'ranked_vendors':        result.get('ranked_vendors', []),
+        'vendor_scores':         result.get('vendor_scores', {}),
+        'risk_flags':            result.get('risk_flags', {}),
+        'anomaly_flags':         result.get('anomaly_flags', {}),
+        'normalized_quotes':     result.get('normalized_quotes', {}),
+        'notification': {
+            'subject':   result.get('email_subject', ''),
+            'html':      result.get('email_html', ''),
+            'recipient': result.get('email_recipient', ''),
+            'delivered_to_outlook': result.get('outlook_draft_created', False),
+        },
+        'report': {
+            'filename':     os.path.basename(report_path) if report_path else '',
+            'available':    bool(report_path and os.path.exists(report_path)),
+            'download_url': '/api/rfq/report',
+        },
+    }
+
+
+@app.route('/api/rfq/report', methods=['GET'])
+def download_report():
+    """Download the generated Excel comparison report."""
+    candidates = [
+        os.path.join(BASE_DIR, 'RFQ_Comparison_Report.xlsx'),
+        os.path.join(os.path.dirname(__file__), 'RFQ_Comparison_Report.xlsx'),
+        'RFQ_Comparison_Report.xlsx',
+    ]
+
+    for path in candidates:
+        if os.path.exists(path):
+            return send_file(
+                path,
+                as_attachment=True,
+                download_name='RFQ_Comparison_Report.xlsx',
+            )
+
+    return jsonify({'error': 'No report generated yet. Process an RFQ first.'}), 404
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({'status': 'healthy'}), 200
+    return jsonify({
+        'status':   'healthy',
+        'platform': sys.platform,
+        'outlook':  sys.platform == 'win32',
+    }), 200
 
 
 if __name__ == '__main__':

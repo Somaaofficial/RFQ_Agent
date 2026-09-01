@@ -26,6 +26,15 @@ class RFQState(TypedDict):
     selected_vendor: str        # final selected vendor name
     po_draft: str               # PO text for winning vendor
 
+    # ── notification payload (shown in the UI) ────────────
+    # Built regardless of whether Outlook is available, so the
+    # frontend can render the recommendation instead of relying
+    # on a desktop mail client.
+    email_subject: str          # "[ACTION REQUIRED] RFQ Evaluation Ready — ..."
+    email_html: str             # full HTML comparison body
+    email_recipient: str        # who it would have gone to
+    outlook_draft_created: bool # False on Linux / when disabled
+
     # ── LangGraph internals ───────────────────────────────
     thread_id: str
 
