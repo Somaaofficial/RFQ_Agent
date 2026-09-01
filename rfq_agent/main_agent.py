@@ -483,12 +483,21 @@ def rank_and_summarise_node(state: RFQState) -> dict:
 
             risk_v = risks.get(v, {})
             if risk_v.get("disqualify_recommended", False):
-                # all_flags entries look like {"severity": "RED", "message": ...}
-                red = [
-                    f.get("message") or f.get("flag") or str(f)
-                    for f in risk_v.get("all_flags", [])
-                    if isinstance(f, dict) and f.get("severity") == "RED"
-                ]
+                # Flags look like:
+                #   {"flag_id","severity","category","condition","detail","action"}
+                # Show "Category: condition" - readable, and the full detail
+                # is still available in all_flags for anyone who wants it.
+                red = []
+                for f in risk_v.get("all_flags", []):
+                    if not isinstance(f, dict) or f.get("severity") != "RED":
+                        continue
+                    cat  = (f.get("category") or "").strip()
+                    cond = (f.get("condition") or f.get("detail") or "").strip()
+                    if cat and cond:
+                        red.append(f"{cat}: {cond}")
+                    elif cond or cat:
+                        red.append(cond or cat)
+
                 detail = "; ".join(red[:3]) if red else (
                     risk_v.get("risk_summary")
                     or f"{risk_v.get('red_count', 0)} red flag(s)"
@@ -497,7 +506,14 @@ def rank_and_summarise_node(state: RFQState) -> dict:
 
             tech_v = tech_sc.get(v, {})
             if tech_v.get("disqualify_on_tech", False):
-                gaps = [str(g) for g in tech_v.get("disqualify_reasons", []) if g]
+                # Reasons arrive as snake_case codes e.g. "moq_exceeds_rfq"
+                gaps = []
+                for g in tech_v.get("disqualify_reasons", []):
+                    if isinstance(g, dict):
+                        g = g.get("reason") or g.get("detail") or str(g)
+                    g = str(g).strip()
+                    if g:
+                        gaps.append(g.replace("_", " ").capitalize())
                 detail = "; ".join(gaps[:3]) if gaps else "mandatory criteria not met"
                 why.append(f"Technical: {detail}")
 
