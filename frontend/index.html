@@ -86,6 +86,16 @@
   .subject{padding:12px 16px;border-top:1px solid var(--line);
     color:var(--muted);font-size:12.5px;word-break:break-word}
 
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+  .field label{display:block;color:var(--muted);font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+  .field input,.field select{width:100%;padding:10px 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--txt);
+    font:inherit;font-size:14px}
+  .field input:focus,.field select:focus{outline:0;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(108,124,255,.18)}
+  .field input.bad-input{border-color:var(--bad)}
+
   .hide{display:none}
   code{background:var(--panel-2);padding:2px 6px;border-radius:5px;font-size:12.5px}
   footer{margin-top:26px;color:var(--muted);font-size:12px;text-align:center}
@@ -104,9 +114,40 @@
     <div class="status-pill" id="apiStatus"><span class="dot" id="apiDot"></span>checking backend…</div>
   </header>
 
+  <!-- ── RFQ details ───────────────────────────────────────────── -->
+  <section class="card">
+    <h2>1 · What are you sourcing?</h2>
+    <p class="hint">
+      These drive the evaluation. <b>Quantity is compared against each vendor's
+      MOQ</b> — a vendor that can't supply this much is disqualified, so get it right.
+    </p>
+
+    <div class="grid">
+      <div class="field" style="grid-column:1/-1">
+        <label for="rfqItem">Item description</label>
+        <input id="rfqItem" type="text" placeholder="e.g. Aluminium Plates 5083 5mm" />
+      </div>
+      <div class="field">
+        <label for="rfqQty">Quantity</label>
+        <input id="rfqQty" type="number" min="0.01" step="any" placeholder="e.g. 5" />
+      </div>
+      <div class="field">
+        <label for="rfqUnit">Unit</label>
+        <select id="rfqUnit">
+          <option>Tons</option><option>Kg</option><option>Pieces</option>
+          <option>Meters</option><option>Litres</option><option>Lot</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="rfqLoc">Delivery location</label>
+        <input id="rfqLoc" type="text" placeholder="e.g. Chennai Plant" />
+      </div>
+    </div>
+  </section>
+
   <!-- ── Upload ────────────────────────────────────────────────── -->
   <section class="card">
-    <h2>1 · Upload vendor quotes</h2>
+    <h2>2 · Upload vendor quotes</h2>
     <p class="hint">A ZIP containing vendor quotation PDFs. Processing takes 2–4 minutes.</p>
 
     <div class="drop" id="drop">
@@ -127,7 +168,7 @@
 
   <!-- ── Results ───────────────────────────────────────────────── -->
   <section class="card hide" id="results">
-    <h2>2 · Evaluation result</h2>
+    <h2>3 · Evaluation result</h2>
     <p class="hint" id="resultHint"></p>
 
     <div class="kpis" id="kpis"></div>
@@ -154,7 +195,7 @@
 
   <!-- ── HITL ──────────────────────────────────────────────────── -->
   <section class="card hide" id="hitl">
-    <h2>3 · Your decision</h2>
+    <h2>4 · Your decision</h2>
     <p class="hint">
       The agent has paused and is waiting for you.
       Session id <code id="tid"></code>
@@ -248,6 +289,19 @@ function note(el,kind,html){ $(el).innerHTML = '<div class="msg '+kind+'">'+html
 // ── Upload + process ───────────────────────────────────────────────
 $('go').onclick = async () => {
   if (!selectedFile) return;
+
+  // Quantity is load-bearing - it gates the MOQ check - so validate it
+  // here rather than letting the backend disqualify everyone silently.
+  const qty = parseFloat($('rfqQty').value);
+  $('rfqQty').classList.remove('bad-input');
+  if (!qty || qty <= 0){
+    $('rfqQty').classList.add('bad-input');
+    $('rfqQty').focus();
+    return note('uploadMsg','err',
+      '<b>Quantity is required.</b> It is compared against each vendor\'s minimum '
+      + 'order quantity — leaving it blank disqualifies every vendor.');
+  }
+
   $('go').disabled = true; $('clear').disabled = true;
   $('bar').classList.remove('hide');
   note('uploadMsg','inf','Processing… extracting PDFs, scoring vendors against '
@@ -255,6 +309,10 @@ $('go').onclick = async () => {
 
   const fd = new FormData();
   fd.append('files', selectedFile);
+  fd.append('rfq_item',          $('rfqItem').value.trim());
+  fd.append('rfq_quantity',      $('rfqQty').value.trim());
+  fd.append('rfq_unit',          $('rfqUnit').value);
+  fd.append('delivery_location', $('rfqLoc').value.trim());
 
   try{
     const r = await fetch(API + '/api/rfq/upload', { method:'POST', body:fd });

@@ -57,6 +57,31 @@ def upload_files():
         if not files or files[0].filename == '':
             return jsonify({'error': 'No files selected'}), 400
 
+        # ── RFQ details (multipart form fields alongside the file) ─────────
+        rfq_item          = (request.form.get('rfq_item') or '').strip() \
+                            or 'Unspecified item'
+        rfq_unit          = (request.form.get('rfq_unit') or '').strip() or 'Kg'
+        delivery_location = (request.form.get('delivery_location') or '').strip() \
+                            or 'Unspecified'
+
+        raw_qty = request.form.get('rfq_quantity')
+        try:
+            rfq_quantity = float(raw_qty) if raw_qty not in (None, '') else 0.0
+        except (TypeError, ValueError):
+            return jsonify({
+                'error': f"rfq_quantity must be a number, got '{raw_qty}'"
+            }), 400
+
+        if rfq_quantity <= 0:
+            return jsonify({
+                'error': 'rfq_quantity is required and must be greater than 0. '
+                         'It is compared against each vendor MOQ, so an '
+                         'incorrect value disqualifies every vendor.'
+            }), 400
+
+        print(f"\n📋 RFQ: {rfq_quantity:,.0f} {rfq_unit} of {rfq_item} "
+              f"to {delivery_location}")
+
         upload_id = f"upload_{os.urandom(8).hex()}"
         upload_dir = os.path.join(UPLOAD_FOLDER, upload_id)
         os.makedirs(upload_dir, exist_ok=True)
@@ -93,11 +118,17 @@ def upload_files():
 
         # Start processing
         try:
+            # RFQ details come alongside the file as multipart form fields.
+            #
+            # These are not cosmetic: rfq_quantity is compared against each
+            # vendor's MOQ, and a vendor whose MOQ exceeds it is disqualified
+            # on technical grounds. The previous hardcoded default of
+            # "1 lot" therefore failed every vendor automatically.
             result = start_rfq_agent(
-                rfq_item="Uploaded Files",
-                rfq_quantity=1,
-                rfq_unit="lot",
-                delivery_location="Default",
+                rfq_item          = rfq_item,
+                rfq_quantity      = rfq_quantity,
+                rfq_unit          = rfq_unit,
+                delivery_location = delivery_location,
                 vendor_quotes_folder=VENDOR_QUOTES_FOLDER,
                 thread_id=upload_id
             )
