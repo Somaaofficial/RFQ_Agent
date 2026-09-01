@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFQ Agent - Upload Files</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f7fafc;
+        }
+
+        .drop-zone:hover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .drop-zone.dragover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .drop-icon {
+            font-size: 48px;
+            margin-bottom: 1.5rem;
+        }
+
+        .drop-zone h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 0.5rem;
+        }
+
+        .drop-zone p {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 1.5rem;
+        }
+
+        .browse-btn {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .browse-btn:hover {
+            background: #3182ce;
+        }
+
+        .file-hint {
+            font-size: 12px;
+            color: #a0aec0;
+            margin-top: 1rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .files-list {
+            margin-top: 2rem;
+        }
+
+        .files-list h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+        }
+
+        .file-item {
+            background: #f7fafc;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a202c;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #e53e3e;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .progress-section {
+            margin-top: 2rem;
+            display: none;
+        }
+
+        .progress-section.show {
+            display: block;
+        }
+
+        .progress-bar {
+            background: #edf2f7;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4299e1, #38a169);
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .success-message {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            color: #166534;
+            text-align: center;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .action-buttons {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .action-buttons button {
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .clear-btn {
+            background: #edf2f7;
+            color: #2d3748;
+        }
+
+        .clear-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .submit-btn {
+            background: #38a169;
+            color: white;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background: #2f855a;
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .info-section {
+            margin-top: 2rem;
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-item {
+            background: #f7fafc;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .info-step {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4299e1;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-item p {
+            font-size: 13px;
+            color: #718096;
+            margin: 0;
+        }
+
+        .error-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            border-radius: 8px;
+            color: #c53030;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RFQ Agent</h1>
+            <p>Upload your PO documents for intelligent processing</p>
+        </div>
+
+        <div class="card">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-icon">📁</div>
+                <h2>Drag & drop your files here</h2>
+                <p>or click to select ZIP files</p>
+                <button class="browse-btn">Browse Files</button>
+                <p class="file-hint">ZIP or RAR format • Max 500MB</p>
+                <input type="file" id="fileInput" multiple accept=".zip,.rar">
+            </div>
+
+            <div class="files-list" id="filesList" style="display: none;">
+                <h3>Files to upload</h3>
+                <div id="filesContainer"></div>
+            </div>
+
+            <div class="progress-section" id="progressSection">
+                <h3>Upload progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progressPercent">0%</span>
+                    <span id="progressFiles">0 file(s)</span>
+                </div>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <strong>✓ Files uploaded successfully!</strong>
+                <p>Your RFQ data is being analyzed...</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="status" id="statusMessage"></div>
+
+            <div class="action-buttons" id="actionButtons" style="display: none;">
+                <button class="clear-btn" onclick="clearFiles()">Clear</button>
+                <button class="submit-btn" onclick="uploadFiles()" id="submitBtn">Process Files</button>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3 style="margin-bottom: 1rem;">How it works</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <p class="info-step">1. Upload</p>
+                    <p>Drag your ZIP file containing PO documents</p>
+                </div>
+                <div class="info-item">
+                    <p class="info-step">2. Parse</p>
+                    <p>AI extracts material, vendor, and quantity data</p>
+                </div>
+                <div class="info-item">
+                    <p class="info-step">3. Review</p>
+                    <p>Validate data before creation</p>
+                </div>
+                <div class="info-item">
+                    <p class="info-step">4. Create</p>
+                    <p>Auto-approve or escalate based on rules</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let selectedFiles = [];
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const filesList = document.getElementById('filesList');
+        const filesContainer = document.getElementById('filesContainer');
+        const actionButtons = document.getElementById('actionButtons');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressFiles = document.getElementById('progressFiles');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const statusMessage = document.getElementById('statusMessage');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(Array.from(e.dataTransfer.files));
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(Array.from(e.target.files));
+        });
+
+        function handleFiles(files) {
+            const validFiles = files.filter(f =>
+                f.name.endsWith('.zip') || f.name.endsWith('.rar')
+            );
+
+            if (validFiles.length === 0) {
+                showError('Please select ZIP or RAR files only');
+                return;
+            }
+
+            selectedFiles = validFiles;
+            updateFilesList();
+        }
+
+        function updateFilesList() {
+            if (selectedFiles.length === 0) {
+                filesList.style.display = 'none';
+                actionButtons.style.display = 'none';
+                return;
+            }
+
+            filesList.style.display = 'block';
+            actionButtons.style.display = 'flex';
+
+            filesContainer.innerHTML = selectedFiles.map((file, idx) => `
+                <div class="file-item">
+                    <div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${(file.size / (1024 * 1024)).toFixed(2)} MB</div>
+                    </div>
+                    <button class="remove-btn" onclick="removeFile(${idx})">×</button>
+                </div>
+            `).join('');
+
+            progressFiles.textContent = `${selectedFiles.length} file(s)`;
+        }
+
+        function removeFile(idx) {
+            selectedFiles.splice(idx, 1);
+            updateFilesList();
+        }
+
+        function clearFiles() {
+            selectedFiles = [];
+            fileInput.value = '';
+            updateFilesList();
+            hideSuccess();
+            hideError();
+        }
+
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) {
+                showError('Please select files first');
+                return;
+            }
+
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            submitBtn.disabled = true;
+            progressSection.classList.add('show');
+            hideError();
+            hideSuccess();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/rfq/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+
+                progressFill.style.width = '100%';
+                progressPercent.textContent = '100%';
+
+                showSuccess();
+                showStatus(`✓ Upload successful! Upload ID: ${data.uploadId}`, 'success');
+
+                setTimeout(() => {
+                    clearFiles();
+                    progressSection.classList.remove('show');
+                    submitBtn.disabled = false;
+                }, 2000);
+
+            } catch (error) {
+                showError(`Upload failed: ${error.message}`);
+                submitBtn.disabled = false;
+            }
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.classList.add('show');
+        }
+
+        function hideError() {
+            errorMessage.classList.remove('show');
+        }
+
+        function showSuccess() {
+            successMessage.classList.add('show');
+        }
+
+        function hideSuccess() {
+            successMessage.classList.remove('show');
+        }
+
+        function showStatus(msg, type) {
+            statusMessage.textContent = msg;
+            statusMessage.className = `status show ${type}`;
+        }
+    </script>
+</body>
+</html>

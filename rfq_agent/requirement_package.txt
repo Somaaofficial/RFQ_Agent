@@ -1,0 +1,15 @@
+langgraph
+langchain
+langchain-mistralai
+langchain-community
+chromadb
+pymupdf
+fpdf2
+openpyxl
+pandas
+python-dotenv
+sentence-transformers
+# Add these lines to your existing requirements
+multer==1.4.5-15
+express==4.18.2
+python-multipart==0.0.6

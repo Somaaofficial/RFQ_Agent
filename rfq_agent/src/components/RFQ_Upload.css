@@ -1,0 +1,264 @@
+.rfq-upload-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.rfq-upload-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.rfq-upload-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.rfq-upload-header h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 0.5rem;
+}
+
+.rfq-upload-header p {
+  font-size: 16px;
+  color: #718096;
+  margin: 0;
+}
+
+.rfq-upload-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+.rfq-drop-zone {
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f7fafc;
+}
+
+.rfq-drop-zone:hover {
+  border-color: #4299e1;
+  background: #ebf8ff;
+}
+
+.rfq-drop-icon {
+  margin-bottom: 1.5rem;
+  color: #4299e1;
+}
+
+.rfq-drop-zone h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 0.5rem;
+}
+
+.rfq-drop-zone p {
+  font-size: 14px;
+  color: #718096;
+  margin: 0 0 1.5rem;
+}
+
+.rfq-browse-btn {
+  background: #4299e1;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.rfq-browse-btn:hover {
+  background: #3182ce;
+}
+
+.rfq-file-hint {
+  font-size: 12px;
+  color: #a0aec0;
+  margin: 1rem 0 0;
+}
+
+.rfq-files-list {
+  margin-top: 2rem;
+}
+
+.rfq-files-list h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rfq-files-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.rfq-file-item {
+  background: #f7fafc;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rfq-file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a202c;
+  margin: 0;
+}
+
+.rfq-file-size {
+  font-size: 12px;
+  color: #718096;
+  margin: 0.25rem 0 0;
+}
+
+.rfq-remove-btn {
+  background: none;
+  border: none;
+  color: #e53e3e;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+}
+
+.rfq-progress-section {
+  margin-top: 2rem;
+}
+
+.rfq-progress-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 1rem;
+}
+
+.rfq-progress-bar {
+  background: #edf2f7;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 8px;
+}
+
+.rfq-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4299e1, #38a169);
+  transition: width 0.3s ease;
+}
+
+.rfq-progress-text {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 12px;
+  color: #718096;
+}
+
+.rfq-success-message {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #166534;
+  text-align: center;
+}
+
+.rfq-success-message p {
+  font-size: 14px;
+  margin: 0.5rem 0 0;
+}
+
+.rfq-action-buttons {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.rfq-clear-btn,
+.rfq-submit-btn {
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.rfq-clear-btn {
+  background: #edf2f7;
+  color: #2d3748;
+}
+
+.rfq-clear-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.rfq-submit-btn {
+  background: #38a169;
+  color: white;
+}
+
+.rfq-submit-btn:hover:not(:disabled) {
+  background: #2f855a;
+}
+
+.rfq-info-section {
+  margin-top: 2rem;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.rfq-info-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 1rem;
+}
+
+.rfq-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.rfq-info-item {
+  background: #f7fafc;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.rfq-info-step {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4299e1;
+  margin: 0 0 0.5rem;
+}
+
+.rfq-info-item p {
+  font-size: 13px;
+  color: #718096;
+  margin: 0;
+}

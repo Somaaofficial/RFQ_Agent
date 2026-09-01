@@ -1,0 +1,86 @@
+{
+  "Tata Steel Ltd": {
+    "past_delivery_score": 92,
+    "on_time_delivery_rate": 90,
+    "quality_issues_count": 0,
+    "po_delays_count": 1,
+    "average_delay_days": 3,
+    "last_award_date": "15-Jan-2026",
+    "total_pos_awarded": 8,
+    "total_pos_completed": 8,
+    "historical_rating": "Excellent",
+    "notes": "Consistent performer across 8 POs. Minor 3-day delay in Jan 2025 due to port congestion \u2014 fully communicated in advance."
+  },
+  "JSW Steel Ltd": {
+    "past_delivery_score": 85,
+    "on_time_delivery_rate": 82,
+    "quality_issues_count": 1,
+    "po_delays_count": 2,
+    "average_delay_days": 7,
+    "last_award_date": "20-Mar-2026",
+    "total_pos_awarded": 5,
+    "total_pos_completed": 5,
+    "historical_rating": "Good",
+    "notes": "One quality rejection in Q3 2025 due to thickness deviation (0.2 mm). Issue resolved; replacement delivered within 10 days."
+  },
+  "Hindustan Alloys Steel": {
+    "past_delivery_score": 78,
+    "on_time_delivery_rate": 74,
+    "quality_issues_count": 2,
+    "po_delays_count": 3,
+    "average_delay_days": 12,
+    "last_award_date": "10-Nov-2025",
+    "total_pos_awarded": 4,
+    "total_pos_completed": 3,
+    "historical_rating": "Average",
+    "notes": "One incomplete PO in Aug 2025 (partial supply, balance pending). Quality issues in 2 batches \u2014 surface finish non-conformance."
+  },
+  "Shree Metals Pvt Ltd": {
+    "past_delivery_score": 88,
+    "on_time_delivery_rate": 86,
+    "quality_issues_count": 0,
+    "po_delays_count": 1,
+    "average_delay_days": 4,
+    "last_award_date": "05-Feb-2026",
+    "total_pos_awarded": 3,
+    "total_pos_completed": 3,
+    "historical_rating": "Good",
+    "notes": "Relatively new supplier with 3 clean POs. One minor delay of 4 days flagged but within acceptable range."
+  },
+  "Prime Supplies LLP": {
+    "past_delivery_score": 60,
+    "on_time_delivery_rate": 55,
+    "quality_issues_count": 3,
+    "po_delays_count": 5,
+    "average_delay_days": 18,
+    "last_award_date": "12-Aug-2025",
+    "total_pos_awarded": 2,
+    "total_pos_completed": 2,
+    "historical_rating": "Poor",
+    "notes": "Multiple delays averaging 18 days. 3 quality non-conformances. Currently under performance improvement plan. Procurement head approval required before next award."
+  },
+  "Apex Metals Trading": {
+    "past_delivery_score": 0,
+    "on_time_delivery_rate": 0,
+    "quality_issues_count": 0,
+    "po_delays_count": 0,
+    "average_delay_days": 0,
+    "last_award_date": null,
+    "total_pos_awarded": 0,
+    "total_pos_completed": 0,
+    "historical_rating": "New Vendor",
+    "notes": "First RFQ participation. No prior transaction history with this entity."
+  },
+  "Global Traders Suppliers": {
+    "past_delivery_score": 0,
+    "on_time_delivery_rate": 0,
+    "quality_issues_count": 0,
+    "po_delays_count": 0,
+    "average_delay_days": 0,
+    "last_award_date": null,
+    "total_pos_awarded": 0,
+    "total_pos_completed": 0,
+    "historical_rating": "New Vendor",
+    "notes": "First RFQ participation. No prior transaction history with this entity."
+  }
+}

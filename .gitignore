@@ -1,0 +1,40 @@
+# ===== SECRETS - NEVER COMMIT =====
+.env
+*.env
+!.env.example
+
+# ===== Python =====
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ===== Node =====
+node_modules/
+package-lock.json
+
+# ===== Vector store (rebuilt at runtime) =====
+Chroma_policy/
+*.sqlite3
+*.bin
+
+# ===== Runtime artifacts =====
+uploads/
+vendor_quotes/
+vendor_quotes_2/
+*.zip
+
+# ===== Generated outputs =====
+extracted_quotes.json
+vendor_scores.json
+risk_flags.json
+RFQ_Comparison_Report.xlsx
+PO_Draft_*.txt
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

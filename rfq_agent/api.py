@@ -1,0 +1,242 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
+import os
+import sys
+import json
+import zipfile
+import shutil
+from pathlib import Path
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from main_agent import run_rfq_agent
+
+app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# Configuration
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+UPLOAD_FOLDER = os.environ.get(
+    'UPLOAD_FOLDER',
+    os.path.join(BASE_DIR, 'uploads')
+)
+VENDOR_QUOTES_FOLDER = os.environ.get(
+    'VENDOR_QUOTES_FOLDER',
+    os.path.join(BASE_DIR, 'vendor_quotes')
+)
+ALLOWED_EXTENSIONS = {'zip', 'rar', 'pdf', 'xlsx'}
+
+# Create folders if they don't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(VENDOR_QUOTES_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/api/rfq/upload', methods=['POST'])
+def upload_files():
+    """Upload and process RFQ files"""
+    try:
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files provided'}), 400
+
+        files = request.files.getlist('files')
+        if not files or files[0].filename == '':
+            return jsonify({'error': 'No files selected'}), 400
+
+        upload_id = f"upload_{os.urandom(8).hex()}"
+        upload_dir = os.path.join(UPLOAD_FOLDER, upload_id)
+        os.makedirs(upload_dir, exist_ok=True)
+
+        saved_files = []
+        extracted_files = []
+
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(upload_dir, filename)
+                file.save(filepath)
+                saved_files.append(filename)
+
+                # If it's a ZIP file, extract it to vendor_quotes folder
+                if filename.lower().endswith('.zip'):
+                    try:
+                        print(f"📦 Extracting {filename}...")
+                        with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                            zip_ref.extractall(VENDOR_QUOTES_FOLDER)
+
+                        # List extracted files
+                        for item in zip_ref.namelist():
+                            if item.lower().endswith(('.pdf', '.docx', '.xlsx')):
+                                extracted_files.append(item)
+                                print(f"   ✓ Extracted: {item}")
+                    except Exception as e:
+                        print(f"   ❌ Failed to extract {filename}: {str(e)}")
+
+        if not saved_files:
+            return jsonify({'error': 'No valid files uploaded'}), 400
+
+        print(f"✓ Total extracted files: {len(extracted_files)}")
+
+        # Start processing
+        try:
+            result = run_rfq_agent(
+                rfq_item="Uploaded Files",
+                rfq_quantity=1,
+                rfq_unit="lot",
+                delivery_location="Default",
+                vendor_quotes_folder=VENDOR_QUOTES_FOLDER,
+                thread_id=upload_id
+            )
+        except Exception as e:
+            print(f"❌ Processing error: {str(e)}")
+            result = None
+
+        return jsonify({
+            'uploadId': upload_id,
+            'files': len(saved_files),
+            'message': f'Successfully uploaded {len(saved_files)} file(s)',
+            'result': result
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Upload error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/rfq/review/<upload_id>', methods=['GET'])
+def get_review_data(upload_id):
+    """Get review data for uploaded files"""
+    try:
+        # Load extracted quotes
+        quotes_file = 'extracted_quotes.json'
+
+        if not os.path.exists(quotes_file):
+            return jsonify({
+                'total': 0,
+                'auto_approved': [],
+                'needs_review': [],
+                'error': 'No extracted data found'
+            }), 200
+
+        with open(quotes_file, 'r') as f:
+            data = json.load(f)
+
+        # Simulate risk assessment
+        auto_approved = []
+        needs_review = []
+
+        for item in data.get('quotes', []):
+            if item.get('price', 0) < 100000:  # Auto-approve < 1 lakh
+                auto_approved.append(item)
+            else:
+                item['risk_level'] = 'medium'
+                item['risk_reason'] = 'High value'
+                needs_review.append(item)
+
+        return jsonify({
+            'total': len(auto_approved) + len(needs_review),
+            'auto_approved': auto_approved,
+            'needs_review': needs_review
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Review error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/rfq/approve', methods=['POST'])
+def approve_pos():
+    """Approve selected POs"""
+    try:
+        data = request.json
+        po_ids = data.get('poIds', [])
+        print(f"✓ Approving {len(po_ids)} POs")
+
+        return jsonify({
+            'message': f'Successfully approved {len(po_ids)} PO(s)',
+            'approved_count': len(po_ids)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/rfq/process', methods=['POST'])
+def process_rfq():
+    """Process RFQ with JSON input (direct agent call)"""
+    try:
+        data = request.json or {}
+
+        # Get parameters from JSON
+        rfq_item = data.get('rfq_item', 'Steel Plates')
+        rfq_quantity = float(data.get('rfq_quantity', 1000))
+        rfq_unit = data.get('rfq_unit', 'kg')
+        delivery_location = data.get('delivery_location', 'Default')
+        thread_id = f"api_{os.urandom(8).hex()}"
+
+        print(f"\n📋 Processing RFQ via JSON:")
+        print(f"   Item: {rfq_item}")
+        print(f"   Qty: {rfq_quantity} {rfq_unit}")
+        print(f"   Location: {delivery_location}")
+
+        # Run agent with JSON parameters
+        result = run_rfq_agent(
+            rfq_item=rfq_item,
+            rfq_quantity=rfq_quantity,
+            rfq_unit=rfq_unit,
+            delivery_location=delivery_location,
+            vendor_quotes_folder=VENDOR_QUOTES_FOLDER,
+            thread_id=thread_id
+        )
+
+        return jsonify({
+            'message': 'RFQ processing complete',
+            'thread_id': thread_id,
+            'result': result
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/rfq/stats', methods=['GET'])
+def get_stats():
+    """Get dashboard statistics"""
+    try:
+        time_range = request.args.get('range', '30d')
+
+        return jsonify({
+            'total_pos': 1000,
+            'auto_approved': 600,
+            'manual_reviewed': 300,
+            'rejected': 50,
+            'pending': 50,
+            'avg_processing_time': '15 min',
+            'total_value': 50000000,
+            'uploads': []
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy'}), 200
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 RFQ Agent API running on http://localhost:{port}")
+    print("📁 Upload folder:", UPLOAD_FOLDER)
+    print("📦 Vendor quotes folder:", VENDOR_QUOTES_FOLDER)
+    app.run(debug=True, port=port, host='0.0.0.0')
