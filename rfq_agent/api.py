@@ -273,10 +273,15 @@ def _summarise(result):
         'human_decision':    result.get('human_decision', ''),
         'selected_vendor':   result.get('selected_vendor', ''),
 
-        'top_recommendation':    result.get('top_recommendation', ''),
-        'recommendation_reason': result.get('recommendation_reason', ''),
-        'ranked_vendors':        result.get('ranked_vendors', []),
-        'qualified_vendors':     result.get('qualified_vendors', []),
+        'top_recommendation':      result.get('top_recommendation', ''),
+        'recommendation_reason':   result.get('recommendation_reason', ''),
+        'recommendation_details':  result.get('recommendation_details', {}),
+        'ranked_vendors':          result.get('ranked_vendors', []),
+        'qualified_vendors':       result.get('qualified_vendors', []),
+        'all_disqualified':        (
+            not result.get('qualified_vendors')
+            and bool(result.get('ranked_vendors'))
+        ),
         'vendor_scores':         result.get('vendor_scores', {}),
         'risk_flags':            result.get('risk_flags', {}),
         'anomaly_flags':         result.get('anomaly_flags', {}),

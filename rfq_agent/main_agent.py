@@ -109,6 +109,16 @@ class RFQState(TypedDict):
     draft_store_id:      str
     thread_id:           str
 
+    # ── notification payload (rendered for the UI) ────────────────────────────
+    # Built whether or not Outlook is available, so the frontend can show
+    # the comparison instead of depending on a desktop mail client.
+    # LangGraph drops any key not declared here, so these must stay in sync
+    # with what email_hitl_node returns.
+    email_subject:         str
+    email_html:            str
+    email_recipient:       str
+    outlook_draft_created: bool
+
 
 class VendorState(TypedDict):
     vendor_name: str
@@ -461,6 +471,51 @@ def rank_and_summarise_node(state: RFQState) -> dict:
     # ── Generate AI recommendation reason (Gap 6 + 7) ─────────────────────────
     recommendation_reason  = ""
     recommendation_details = {}
+
+    # ── No vendor cleared the mandatory gates ─────────────────────────────────
+    # This is a legitimate outcome, not an error. Surface *why* so the
+    # reviewer can act (waive a rule, re-float the RFQ, request documents)
+    # instead of just seeing "N/A".
+    if top == "N/A" and ranked:
+        reasons = {}
+        for v in ranked:
+            why = []
+            if risks.get(v, {}).get("disqualify_recommended", False):
+                flags = risks.get(v, {}).get("red_flags", [])
+                why.append("Risk: " + ("; ".join(flags[:3]) if flags else "red flags raised"))
+            if tech_sc.get(v, {}).get("disqualify_on_tech", False):
+                gaps = tech_sc.get(v, {}).get("mandatory_gaps", [])
+                why.append("Technical: " + ("; ".join(gaps[:3]) if gaps else "mandatory criteria not met"))
+            if why:
+                reasons[v] = why
+
+        best = ranked[0]
+        best_score = scores.get(best, {}).get("total_score", 0)
+
+        recommendation_reason = (
+            f"No vendor cleared the mandatory qualification criteria, so no "
+            f"award is recommended. {best} ranked highest on blended score "
+            f"({best_score:.1f}/100) but was disqualified. Review the gaps "
+            f"below and either request the missing documentation, waive a "
+            f"non-critical criterion, or re-float the RFQ."
+        )
+        recommendation_details = {
+            "recommended_vendor":     None,
+            "recommendation_summary": recommendation_reason,
+            "all_disqualified":       True,
+            "highest_ranked_vendor":  best,
+            "highest_ranked_score":   best_score,
+            "disqualification_reasons": reasons,
+            "suggested_actions": [
+                "Request missing documentation from the highest-ranked vendors",
+                "Waive a non-critical criterion if commercially justified",
+                "Re-float the RFQ with clarified mandatory requirements",
+            ],
+        }
+
+        print(f"\n  ⛔ NO QUALIFIED VENDORS — {len(ranked)} evaluated, all disqualified")
+        for v, why in list(reasons.items())[:3]:
+            print(f"     • {v}: {'; '.join(why)}")
 
     if top != "N/A":
         # Build a tight summary for the top 3 vendors to keep the prompt small
