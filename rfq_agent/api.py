@@ -129,16 +129,38 @@ def get_review_data(upload_id):
         with open(quotes_file, 'r') as f:
             data = json.load(f)
 
-        # Simulate risk assessment
+        # main_agent writes {"quotes": {vendor_name: {...}}} - a dict keyed
+        # by vendor, not a list. Iterating it directly yields the vendor
+        # name strings, so normalise to a list of dicts first.
+        raw = data.get('quotes', {})
+        if isinstance(raw, dict):
+            quotes = []
+            for vendor_name, fields in raw.items():
+                if isinstance(fields, dict):
+                    quotes.append({'vendor_name': vendor_name, **fields})
+        elif isinstance(raw, list):
+            quotes = [q for q in raw if isinstance(q, dict)]
+        else:
+            quotes = []
+
+        # Risk-based triage: only high-value quotes need a human look.
+        threshold = float(os.environ.get('REVIEW_THRESHOLD', 100000))
+
         auto_approved = []
         needs_review = []
 
-        for item in data.get('quotes', []):
-            if item.get('price', 0) < 100000:  # Auto-approve < 1 lakh
+        for item in quotes:
+            value = item.get('landed_cost') or item.get('price') or 0
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                value = 0.0
+
+            if value < threshold:
                 auto_approved.append(item)
             else:
                 item['risk_level'] = 'medium'
-                item['risk_reason'] = 'High value'
+                item['risk_reason'] = f'Value {value:,.0f} exceeds {threshold:,.0f}'
                 needs_review.append(item)
 
         return jsonify({
