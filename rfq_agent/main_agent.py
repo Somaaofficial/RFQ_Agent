@@ -999,6 +999,69 @@ def get_agent_app():
     return _COMPILED_APP
 
 
+def get_thread_status(thread_id: str) -> dict:
+    """
+    Report whether a paused review is still resumable.
+
+    Paused graphs live in the worker's memory, so they are lost on sleep,
+    restart or deploy. The UI calls this before showing approval controls
+    so the reviewer finds out up front rather than after clicking Approve.
+
+    Returns:
+        {
+          "thread_id": str,
+          "exists":    bool,   # known to this worker
+          "awaiting_decision": bool,
+          "completed": bool,
+          "top_recommendation": str,
+          "message":   str,
+        }
+    """
+    app    = get_agent_app()
+    config = {"configurable": {"thread_id": thread_id}}
+
+    try:
+        snapshot = app.get_state(config)
+    except Exception as exc:                           # noqa: BLE001
+        return {
+            "thread_id": thread_id,
+            "exists":    False,
+            "awaiting_decision": False,
+            "completed": False,
+            "top_recommendation": "",
+            "message":   f"Could not read thread state: {exc}",
+        }
+
+    if not snapshot or not snapshot.values:
+        return {
+            "thread_id": thread_id,
+            "exists":    False,
+            "awaiting_decision": False,
+            "completed": False,
+            "top_recommendation": "",
+            "message":   (
+                "This review session is no longer available - the server "
+                "restarted or went to sleep. Please re-run the RFQ."
+            ),
+        }
+
+    still_paused = bool(snapshot.next)
+
+    return {
+        "thread_id": thread_id,
+        "exists":    True,
+        "awaiting_decision": still_paused,
+        "completed": not still_paused,
+        "top_recommendation": snapshot.values.get("top_recommendation", ""),
+        "human_decision":     snapshot.values.get("human_decision", ""),
+        "message": (
+            "Awaiting your decision."
+            if still_paused
+            else "This review has already been completed."
+        ),
+    }
+
+
 def resume_rfq_agent(thread_id: str, decision: str) -> dict:
     """
     Phase 2 — resume a graph paused at the HITL interrupt.

@@ -11,7 +11,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main_agent import start_rfq_agent, resume_rfq_agent
+from main_agent import start_rfq_agent, resume_rfq_agent, get_thread_status
 
 app = Flask(__name__)
 
@@ -299,6 +299,23 @@ def _summarise(result):
             'download_url': '/api/rfq/report',
         },
     }
+
+
+@app.route('/api/rfq/status/<thread_id>', methods=['GET'])
+def thread_status(thread_id):
+    """
+    Is this review still resumable?
+
+    Paused graphs are held in worker memory, so they do not survive a
+    sleep, restart or deploy. The UI polls this before enabling the
+    approval buttons so an expired session is caught up front.
+    """
+    try:
+        status = get_thread_status(thread_id)
+        return jsonify(status), 200 if status.get('exists') else 404
+    except Exception as e:
+        print(f"❌ Status error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/rfq/decision', methods=['POST'])
